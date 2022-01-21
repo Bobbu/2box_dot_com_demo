@@ -1,4 +1,4 @@
-# box_dot_com_demo
+# 2box_dot_com_demo
 
 A mini app intended to illustrate incorporating Box.com into a Flutter app -- using the Oauth2 REST API from Box.com.
 
