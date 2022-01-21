@@ -1,16 +1,8 @@
 # box_dot_com_demo
 
-A new Flutter project.
+A mini app intended to illustrate incorporating Box.com into a Flutter app -- using the Oauth2 REST API from Box.com.
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+You will want to create an account and an app at developer.box.com. The app should be a "custom app" intended for individuals and potentially affording any/all possible scopes.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://flutter.dev/docs/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://flutter.dev/docs/cookbook)
-
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
