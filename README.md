@@ -9,4 +9,5 @@ You will want to create an account and an app at developer.box.com. The app shou
 ## Key Dependencies
 
 flutter_web_auth
+
 https://pub.dev/packages/flutter_web_auth
