@@ -6,3 +6,7 @@ A mini app intended to illustrate incorporating Box.com into a Flutter app -- us
 
 You will want to create an account and an app at developer.box.com. The app should be a "custom app" intended for individuals and potentially affording any/all possible scopes.
 
+## Key Dependencies
+
+flutter_web_auth
+https://pub.dev/packages/flutter_web_auth
