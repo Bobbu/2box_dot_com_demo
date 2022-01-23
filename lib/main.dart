@@ -40,13 +40,16 @@ class _MyHomePageState extends State<MyHomePage> {
         'https://account.box.com/api/oauth2/authorize';
     const clientId = 'dbneallex3uliy7zo7xtkvj380v935ux';
 
-    const callbackUrlScheme =
-        'technology.catalyst.hrp'; // this also goes in some manifest stuff
-    const redirectUri = '$callbackUrlScheme:/';
+    // this also goes in <approot>/android/app/src/AndroidManifest.xml
+    const callbackUrlScheme = 'technology.catalyst.hrp';
+    const redirectUri = 'https://$callbackUrlScheme:/';
     const completeAuthUriString =
-        '$authorizationEndpoint&response_type=code&client_id=$clientId&redirect_uri=$redirectUri';
+        '$authorizationEndpoint?response_type=code&client_id=$clientId&redirect_uri=$redirectUri';
+    // '$authorizationEndpoint?response_type=code&client_id=$clientId&redirect_uri=https://catalyst.technology';
 
-    print('sending this to box.com: $completeAuthUriString');
+    debugPrint('callbackUrlScheme is $callbackUrlScheme');
+    debugPrint('redirectUri is $redirectUri');
+    debugPrint('sending this to box.com: $completeAuthUriString');
 
     // Present the dialog to the user
 
@@ -58,14 +61,15 @@ class _MyHomePageState extends State<MyHomePage> {
 
       // Extract token from resulting url
       final token = Uri.parse(result).queryParameters['token'];
-      print('token is $token');
-      print('TODO: Save token to secure local storage');
+      debugPrint('token is $token');
+      debugPrint('TODO: Save token to secure local storage');
       setState(() {
         _connectionState = 'Connected (real)';
         _isAuthed = true;
       });
     } on PlatformException catch (pe) {
-      print('Did not get desired auth. exceptiopn message is: ${pe.message}');
+      debugPrint(
+          'Did not get desired auth. exception message is: ${pe.message}');
       setState(() {
         _connectionState = 'Failed to connect (real)';
         _isAuthed = false;
@@ -73,12 +77,12 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void _authAtBox() {
-    setState(() {
-      _connectionState = 'Connected (faked)';
-      _isAuthed = true;
-    });
-  }
+  // void _authAtBox() {
+  //   setState(() {
+  //     _connectionState = 'Connected (faked)';
+  //     _isAuthed = true;
+  //   });
+  // }
 
   void _getSomeTelltaleInfo() {
     setState(() {
