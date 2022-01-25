@@ -180,3 +180,80 @@ curl -i -X POST "https://api.box.com/2.0/folders" \
         ]
     }
 }
+
+
+
+7) Upload a File
+
+
+curl -i -X POST "https://upload.box.com/api/2.0/files/content" \
+     -H "Authorization: Bearer QMyXOkfHJvP3239bDCrCFMws1gDEnJQp" \
+     -H "Content-Type: multipart/form-data" \
+     -F attributes='{"name":"samplefile.txt", "parent":{"id":"0"}}' \
+     -F file=@samplefile.txt
+
+     {
+    "total_count": 1,
+    "entries": [
+        {
+            "type": "file",
+            "id": "910176775840",
+            "file_version": {
+                "type": "file_version",
+                "id": "980446213840",
+                "sha1": "c570cc36a348f5f937c6a2529d4df823c0b950a7"
+            },
+            "sequence_id": "0",
+            "etag": "0",
+            "sha1": "c570cc36a348f5f937c6a2529d4df823c0b950a7",
+            "name": "samplefile.txt",
+            "description": "",
+            "size": 101,
+            "path_collection": {
+                "total_count": 1,
+                "entries": [
+                    {
+                        "type": "folder",
+                        "id": "0",
+                        "sequence_id": null,
+                        "etag": null,
+                        "name": "All Files"
+                    }
+                ]
+            },
+            "created_at": "2022-01-24T17:51:17-08:00",
+            "modified_at": "2022-01-24T17:51:17-08:00",
+            "trashed_at": null,
+            "purged_at": null,
+            "content_created_at": "2022-01-24T17:51:17-08:00",
+            "content_modified_at": "2022-01-24T17:51:17-08:00",
+            "created_by": {
+                "type": "user",
+                "id": "7376008478",
+                "name": "Rob Daly",
+                "login": "robertjosephdaly@gmail.com"
+            },
+            "modified_by": {
+                "type": "user",
+                "id": "7376008478",
+                "name": "Rob Daly",
+                "login": "robertjosephdaly@gmail.com"
+            },
+            "owned_by": {
+                "type": "user",
+                "id": "7376008478",
+                "name": "Rob Daly",
+                "login": "robertjosephdaly@gmail.com"
+            },
+            "shared_link": null,
+            "parent": {
+                "type": "folder",
+                "id": "0",
+                "sequence_id": null,
+                "etag": null,
+                "name": "All Files"
+            },
+            "item_status": "active"
+        }
+    ]
+}

@@ -334,4 +334,51 @@ class BoxService {
 
     return result;
   }
+
+  //////////////////////////////////////////////////////////////////////////////
+  Future<BoxFolderItem> uploadFile(String localPathname, String simpleFilename,
+      String parentFolderId) async {
+    const uploadFileUriString = 'https://upload.box.com/api/2.0/files/content';
+    // const uploadFileUriString = '$boxApiRoot/files/content';
+
+    // TODO Check that _accessToken is current first
+    debugPrint('Need to check _accessToken is fresh first');
+
+    final body = jsonEncode({
+      'attributes': {
+        'name': simpleFilename,
+        'parent': {'id': parentFolderId}
+      },
+      'file': '@$localPathname'
+    });
+
+    http.Response res = await http.post(Uri.parse(uploadFileUriString),
+        headers: <String, String>{
+          'authorization': 'Bearer $_accessToken',
+          'Content-type': 'multipart/form-data'
+        },
+        body: body);
+
+    // Success is 201 in this case, not 200.
+    if (res.statusCode == 201) {
+      // Weirdly, this returns a list with one entry...
+      List<dynamic> body = jsonDecode(res.body)['entries'];
+      List<BoxFolderItem> resultList = body
+          .map(
+            (dynamic item) => BoxFolderItem.fromJson(item),
+          )
+          .toList();
+
+      BoxFolderItem result = resultList.first;
+      debugPrint(
+          'File uploaded -- name is ${result.name} and id is ${result.id}');
+      return result;
+    } else {
+      debugPrint('Error code is ${res.statusCode}');
+      debugPrint('Error is ${res.reasonPhrase}');
+
+      throw Exception(
+          'Unable to upload $localPathname to $simpleFilename in parent folder $parentFolderId');
+    }
+  }
 }
