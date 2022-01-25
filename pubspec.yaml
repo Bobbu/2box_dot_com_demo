@@ -32,6 +32,7 @@ dependencies:
   flutter_web_auth: ^0.4.0
   http:
   intl:
+  flutter_secure_storage: ^5.0.2
   file_picker: ^4.3.2
 
 

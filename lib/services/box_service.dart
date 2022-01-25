@@ -1,7 +1,9 @@
+import 'dart:convert' show jsonDecode, jsonEncode;
+// import 'dart:io'; // for uploadFile
 import 'package:flutter_web_auth/flutter_web_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'dart:convert' show jsonDecode, jsonEncode;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 /////////////////////////////////////////////////////////////////////////
@@ -118,6 +120,11 @@ class BoxFolderItem {
 
 //////////////////////////////////////////////////////////////////////////////
 class BoxService {
+  // We will store refreshToken and possibly more credentials here.
+  // See https://pub.dev/packages/flutter_secure_storage
+  //
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+
   // Some constants
   //
 
@@ -197,6 +204,9 @@ class BoxService {
 
       _accessToken = accessToken;
       _refreshToken = refreshToken;
+
+      // Preserve the refreshToken
+      await _secureStorage.write(key: 'refresh_token', value: _refreshToken);
 
       return _accessToken;
     } on PlatformException catch (pe) {
@@ -338,44 +348,53 @@ class BoxService {
   //////////////////////////////////////////////////////////////////////////////
   Future<BoxFolderItem> uploadFile(String localPathname, String simpleFilename,
       String parentFolderId) async {
-    const uploadFileUriString = 'https://upload.box.com/api/2.0/files/content';
-    // const uploadFileUriString = '$boxApiRoot/files/content';
-
     // TODO Check that _accessToken is current first
     debugPrint('Need to check _accessToken is fresh first');
 
-    final body = jsonEncode({
-      'attributes': {
-        'name': simpleFilename,
-        'parent': {'id': parentFolderId}
-      },
-      'file': '@$localPathname'
+    const uploadFileUriString = 'https://upload.box.com/api/2.0/files/content';
+
+    //create multipart request for POST or PATCH method
+    var request = http.MultipartRequest("POST", Uri.parse(uploadFileUriString));
+
+    final attributes = jsonEncode({
+      'name': simpleFilename,
+      'parent': {'id': parentFolderId}
     });
 
-    http.Response res = await http.post(Uri.parse(uploadFileUriString),
-        headers: <String, String>{
-          'authorization': 'Bearer $_accessToken',
-          'Content-type': 'multipart/form-data'
-        },
-        body: body);
+    debugPrint(attributes);
+
+    request.headers['authorization'] = 'Bearer $_accessToken';
+    request.headers['Content-type'] = 'multipart/form-data';
+    request.fields['attributes'] = attributes;
+
+    var fileToUpload =
+        await http.MultipartFile.fromPath("file_field", localPathname);
+    //add multipart to request
+    request.files.add(fileToUpload);
+    var response = await request.send();
+
+    //Get the response from the server
+    var responseData = await response.stream.toBytes();
+    var responseString = String.fromCharCodes(responseData);
+
+    debugPrint(responseString);
+    final respBody = jsonDecode(responseString);
 
     // Success is 201 in this case, not 200.
-    if (res.statusCode == 201) {
-      // Weirdly, this returns a list with one entry...
-      List<dynamic> body = jsonDecode(res.body)['entries'];
-      List<BoxFolderItem> resultList = body
+    if (response.statusCode == 201) {
+      List<dynamic> listOfOne = respBody['entries'];
+      List<BoxFolderItem> resultList = listOfOne
           .map(
             (dynamic item) => BoxFolderItem.fromJson(item),
           )
           .toList();
 
       BoxFolderItem result = resultList.first;
-      debugPrint(
-          'File uploaded -- name is ${result.name} and id is ${result.id}');
+
       return result;
     } else {
-      debugPrint('Error code is ${res.statusCode}');
-      debugPrint('Error is ${res.reasonPhrase}');
+      debugPrint('Error code is ${response.statusCode}');
+      debugPrint('Error is ${response.reasonPhrase}');
 
       throw Exception(
           'Unable to upload $localPathname to $simpleFilename in parent folder $parentFolderId');

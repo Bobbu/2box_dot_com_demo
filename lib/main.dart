@@ -157,7 +157,7 @@ class _MyHomePageState extends State<MyHomePage> {
         });
       } on Exception catch (e) {
         final errorMessage =
-            'Yikes. Could upload file ${file.path} to root folder';
+            'Yikes. Could not upload file ${file.path} to root folder';
         debugPrint(errorMessage);
         debugPrint(e.toString());
         setState(() {
