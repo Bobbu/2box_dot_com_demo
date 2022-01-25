@@ -1,0 +1,31 @@
+{
+    "total_count": 2,
+    "entries": [
+        {
+            "type": "folder",
+            "id": "154663638392",
+            "sequence_id": "0",
+            "etag": "0",
+            "name": "hrp-images"
+        },
+        {
+            "type": "folder",
+            "id": "139465605542",
+            "sequence_id": "0",
+            "etag": "0",
+            "name": "Image Repository"
+        }
+    ],
+    "offset": 0,
+    "limit": 100,
+    "order": [
+        {
+            "by": "type",
+            "direction": "ASC"
+        },
+        {
+            "by": "name",
+            "direction": "ASC"
+        }
+    ]
+}

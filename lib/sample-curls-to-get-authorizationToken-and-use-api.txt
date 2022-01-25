@@ -1,0 +1,182 @@
+1) Exchange an authentation Code for an access token (and refresh token)
+
+curl -i -X POST "https://api.box.com/oauth2/token" \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     -d "client_id=dbneallex3uliy7zo7xtkvj380v935ux" \
+     -d "client_secret=NgwLcqY66W2TyrUHFjVl2J9ylm2N9WV0" \
+     -d "code=Pz1dm61Up9Qbc5xv9kLWcxmY0QkLVTRT" \
+     -d "grant_type=authorization_code"
+
+Representative return:
+
+{
+    access_token: 7taBsRfVgc6KnRsrkr9ifKZAQbcg1Zeg, 
+    expires_in: 4033, 
+    restricted_to: [], 
+    refresh_token: aBjTLhXlvImieAjqZu76y4tpUonSnUX8evR68xS0JIwGmj1GWQyB95mqU5ybluMR, 
+    token_type: bearer
+}
+
+2) Get the current user
+
+     curl https://api.box.com/2.0/users/me \
+    -H "authorization: Bearer 7taBsRfVgc6KnRsrkr9ifKZAQbcg1Zeg"
+
+
+Representative return:
+
+{
+    "type":"user",
+    "id":"7376008478",
+    "name":"Rob Daly",
+    "login":"robertjosephdaly@gmail.com",
+    "created_at":"2019-02-20T11:54:23-08:00",
+    "modified_at":"2022-01-23T08:25:30-08:00",
+    "language":"en",
+    "timezone":"America\/Los_Angeles",
+    "space_amount":10737418240,
+    "space_used":0,
+    "max_upload_size":2147483648,
+    "status":"active",
+    "job_title":"CGO",
+    "phone":"(202) 657-3246",
+    "address":"4428 Volta Pl NW, Washington DC 20007",
+    "avatar_url":"https:\/\/app.box.com\/api\/avatar\/large\/7376008478"
+    "notification_email":[]
+}
+
+3) See if there is a folder with a certain name in the root folder CANNOT GERT THIS TO WORK!
+     
+curl -i -X GET "https://api.box.com/2.0/search?query=hrp-images&type=folder" \
+     -H "Authorization: Bearer 73s4Ipr20m7VS3CwGJXtsNl5wpujfmxV"
+
+
+4) Get folder information for a folder
+
+curl -i -X GET "https://api.box.com/2.0/folders/0" \
+     -H "Authorization: Bearer 73s4Ipr20m7VS3CwGJXtsNl5wpujfmxV"
+
+{"type":"folder","id":"0","sequence_id":null,"etag":null,"name":"All Files","created_at":null,"modified_at":null,"description":"","size":0,"path_collection":{"total_count":0,"entries":[]},"created_by":{"type":"user","id":"","name":"","login":""},"modified_by":{"type":"user","id":"7376008478","name":"Rob Daly","login":"robertjosephdaly@gmail.com"},"trashed_at":null,"purged_at":null,"content_created_at":null,"content_modified_at":null,"owned_by":{"type":"user","id":"7376008478","name":"Rob Daly","login":"robertjosephdaly@gmail.com"},"shared_link":null,"folder_upload_email":null,"parent":null,"item_status":"active","item_collection":{"total_count":2,"entries":[{"type":"folder","id":"154663638392","sequence_id":"0","etag":"0","name":"hrp-images"},{"type":"folder","id":"139465605542","sequence_id":"0","etag":"0","name":"Image Repository"}],"offset":0,"limit":100,"order":[{"by":"type","direction":"ASC"},{"by":"name","direction":"ASC"}]}}
+
+
+5) List items in a folder
+
+curl -i -X GET "https://api.box.com/2.0/folders/0/items" \
+     -H "Authorization: Bearer 73s4Ipr20m7VS3CwGJXtsNl5wpujfmxV"
+
+{
+    "total_count": 2,
+    "entries": [
+        {
+            "type": "folder",
+            "id": "154663638392",
+            "sequence_id": "0",
+            "etag": "0",
+            "name": "hrp-images"
+        },
+        {
+            "type": "folder",
+            "id": "139465605542",
+            "sequence_id": "0",
+            "etag": "0",
+            "name": "Image Repository"
+        }
+    ],
+    "offset": 0,
+    "limit": 100,
+    "order": [
+        {
+            "by": "type",
+            "direction": "ASC"
+        },
+        {
+            "by": "name",
+            "direction": "ASC"
+        }
+    ]
+}
+
+
+6) Create a folder
+
+curl -i -X POST "https://api.box.com/2.0/folders" \
+     -H "Authorization: Bearer kzwBA8jOwkqePaxYAm4G6WKrb7X8Qms5" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "name": "New Folder",
+       "parent": {
+         "id": "0"
+       }
+     }'
+
+{
+    "type": "folder",
+    "id": "154735971611",
+    "sequence_id": "0",
+    "etag": "0",
+    "name": "New Folder",
+    "created_at": "2022-01-24T11:04:07-08:00",
+    "modified_at": "2022-01-24T11:04:07-08:00",
+    "description": "",
+    "size": 0,
+    "path_collection": {
+        "total_count": 1,
+        "entries": [
+            {
+                "type": "folder",
+                "id": "0",
+                "sequence_id": null,
+                "etag": null,
+                "name": "All Files"
+            }
+        ]
+    },
+    "created_by": {
+        "type": "user",
+        "id": "7376008478",
+        "name": "Rob Daly",
+        "login": "robertjosephdaly@gmail.com"
+    },
+    "modified_by": {
+        "type": "user",
+        "id": "7376008478",
+        "name": "Rob Daly",
+        "login": "robertjosephdaly@gmail.com"
+    },
+    "trashed_at": null,
+    "purged_at": null,
+    "content_created_at": "2022-01-24T11:04:07-08:00",
+    "content_modified_at": "2022-01-24T11:04:07-08:00",
+    "owned_by": {
+        "type": "user",
+        "id": "7376008478",
+        "name": "Rob Daly",
+        "login": "robertjosephdaly@gmail.com"
+    },
+    "shared_link": null,
+    "folder_upload_email": null,
+    "parent": {
+        "type": "folder",
+        "id": "0",
+        "sequence_id": null,
+        "etag": null,
+        "name": "All Files"
+    },
+    "item_status": "active",
+    "item_collection": {
+        "total_count": 0,
+        "entries": [],
+        "offset": 0,
+        "limit": 100,
+        "order": [
+            {
+                "by": "type",
+                "direction": "ASC"
+            },
+            {
+                "by": "name",
+                "direction": "ASC"
+            }
+        ]
+    }
+}

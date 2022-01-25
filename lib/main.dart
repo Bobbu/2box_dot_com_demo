@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_web_auth/flutter_web_auth.dart';
-import 'package:flutter/services.dart';
+// import 'package:flutter_web_auth/flutter_web_auth.dart';
+// import 'package:flutter/services.dart';
+// import 'dart:convert' show jsonDecode;
+// import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import './services/box_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -35,41 +39,21 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _isAuthed = false;
   String _someTellTaleInfo = 'I have no idea what folders and files exist';
 
+  BoxService boxService = BoxService();
+
   void _authenticate() async {
-    const authorizationEndpoint =
-        'https://account.box.com/api/oauth2/authorize';
-    const clientId = 'dbneallex3uliy7zo7xtkvj380v935ux';
+    String accessToken = await boxService.init();
 
-    // this also goes in <approot>/android/app/src/AndroidManifest.xml
-    const callbackUrlScheme = 'technology.catalyst.hrp';
-    const redirectUri = 'https://$callbackUrlScheme:/';
-    const completeAuthUriString =
-        '$authorizationEndpoint?response_type=code&client_id=$clientId&redirect_uri=$redirectUri';
-    // '$authorizationEndpoint?response_type=code&client_id=$clientId&redirect_uri=https://catalyst.technology';
+    debugPrint(accessToken);
 
-    debugPrint('callbackUrlScheme is $callbackUrlScheme');
-    debugPrint('redirectUri is $redirectUri');
-    debugPrint('sending this to box.com: $completeAuthUriString');
+    if (accessToken != '') {
+      BoxUser bu = await boxService.getUser();
 
-    // Present the dialog to the user
-
-    try {
-      final result = await FlutterWebAuth.authenticate(
-        url: completeAuthUriString,
-        callbackUrlScheme: callbackUrlScheme,
-      );
-
-      // Extract token from resulting url
-      final token = Uri.parse(result).queryParameters['token'];
-      debugPrint('token is $token');
-      debugPrint('TODO: Save token to secure local storage');
       setState(() {
-        _connectionState = 'Connected (real)';
+        _connectionState = 'Connected (${bu.name})';
         _isAuthed = true;
       });
-    } on PlatformException catch (pe) {
-      debugPrint(
-          'Did not get desired auth. exception message is: ${pe.message}');
+    } else {
       setState(() {
         _connectionState = 'Failed to connect (real)';
         _isAuthed = false;
@@ -77,17 +61,43 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  // void _authAtBox() {
-  //   setState(() {
-  //     _connectionState = 'Connected (faked)';
-  //     _isAuthed = true;
-  //   });
-  // }
+  void _getSomeTelltaleInfo() async {
+    List<BoxFolderItem> rootItems = await boxService.fetchFolderItems('0');
+    if (rootItems.isNotEmpty) {
+      setState(() {
+        final name = rootItems[0].name;
+        final type = rootItems[0].type;
+        _someTellTaleInfo = 'There is a $type named $name';
+      });
+    } else {
+      setState(() {
+        _someTellTaleInfo = 'Nothing found in the root folder. Get on it.';
+      });
+    }
+  }
 
-  void _getSomeTelltaleInfo() {
-    setState(() {
-      _someTellTaleInfo = 'Got a folder named \'Dirt on B & D\' (faked)';
-    });
+  void _createRandomlyNamedFolder() async {
+    final DateFormat formatter = DateFormat('yyyy-MM-dd hh-mm-ss');
+    final String randomEnoughName = 'rando' + formatter.format(DateTime.now());
+    debugPrint(randomEnoughName);
+    try {
+      BoxFolderItem newFolder =
+          await boxService.createFolder('0', randomEnoughName);
+      final message =
+          'Created folder named ${newFolder.name} with Id ${newFolder.id}';
+      debugPrint(message);
+      setState(() {
+        _someTellTaleInfo = message;
+      });
+    } on Exception catch (e) {
+      final errorMessage =
+          'Yikes. Could not create folder named $randomEnoughName';
+      debugPrint(errorMessage);
+      debugPrint(e.toString());
+      setState(() {
+        _someTellTaleInfo = errorMessage;
+      });
+    }
   }
 
   @override
@@ -109,7 +119,7 @@ class _MyHomePageState extends State<MyHomePage> {
               _someTellTaleInfo,
             ),
             const SizedBox(height: 20),
-            Row(
+            Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ElevatedButton(
@@ -118,7 +128,11 @@ class _MyHomePageState extends State<MyHomePage> {
                 const SizedBox(width: 10),
                 ElevatedButton(
                     onPressed: _isAuthed ? _getSomeTelltaleInfo : null,
-                    child: const Text('Grab some telltale info'))
+                    child: const Text('Grab some telltale info')),
+                const SizedBox(width: 10),
+                ElevatedButton(
+                    onPressed: _isAuthed ? _createRandomlyNamedFolder : null,
+                    child: const Text('Create randomly-named folder'))
               ],
             ),
           ],

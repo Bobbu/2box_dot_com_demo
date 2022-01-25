@@ -30,6 +30,8 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_web_auth: ^0.4.0
+  http:
+  intl:
 
 
   # The following adds the Cupertino Icons font to your application.
