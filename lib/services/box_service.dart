@@ -6,7 +6,16 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
-/////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+//
+// In this package, we define several basic abstractions, including BoxUser and
+// BoxFolderItem, as well as the base service, BoxService. Each of these
+// abstractions are effectively a subset of those provided by the Box.com API
+// that is available through developer.box.com. Note that BoxService is fra from
+// an exhaustive SDK.
+//
+//
+///////////////////////////////////////////////////////////////////////////////
 
 class BoxUser {
   final String id;
@@ -31,9 +40,8 @@ class BoxUser {
       required this.avatarUrl});
 
   static _safelyParsedDateTime(final String dateTimeAsString) {
-    // TODO: Until we run against some of the external systems we won't know what
-    // their actual formatted date strings look like. for now let's be safe
-    // and assume parsing may fail.
+    // Just being safe in case their datetime values change to a format we can't
+    // parse. Let's be safe and assume parsing may fail.
     DateTime result = DateTime.now();
     try {
       result = DateTime.parse(dateTimeAsString);
@@ -129,22 +137,22 @@ class BoxService {
   //
 
   // Client App IDs (Should likely hide)
-  static const clientId = 'dbneallex3uliy7zo7xtkvj380v935ux';
-  static const clientSecret = 'NgwLcqY66W2TyrUHFjVl2J9ylm2N9WV0';
+  static const _clientId = 'dbneallex3uliy7zo7xtkvj380v935ux';
+  static const _clientSecret = 'NgwLcqY66W2TyrUHFjVl2J9ylm2N9WV0';
 
   // Oauth2
   static const oauth2Root = 'https://account.box.com/api/oauth2';
   static const authorizationEndpoint = '$oauth2Root/authorize';
   static const tokenEndpoint = '$oauth2Root/token';
-  // this also goes in <approot>/android/app/src/AndroidManifest.xml
+  // callbackUrlScheme also goes in <approot>/android/app/src/AndroidManifest.xml
   static const callbackUrlScheme = 'hrp01';
   // The redirect URI must match what is defined at developer.box.com:
   //
-  // Loomk for something like: redirectUri => hrp01://redirect
+  // Look for something like: redirectUri => hrp01://redirect
   //
   static const redirectUri = '$callbackUrlScheme://redirect';
   static const completeAuthUriString =
-      '$authorizationEndpoint?response_type=code&client_id=$clientId&redirect_uri=$redirectUri';
+      '$authorizationEndpoint?response_type=code&client_id=$_clientId&redirect_uri=$redirectUri';
 
   // Finally, for Box API
   static const boxApiRoot = 'https://api.box.com/2.0';
@@ -153,12 +161,51 @@ class BoxService {
   // must occur.
   String _accessToken = '';
   String _refreshToken = '';
+  DateTime _accessTokenExpiry = DateTime.now(); // We will set it
 
+  /////////////////////////////////////////////////////////////////////////////
+  Future<void> _readCredentials() async {
+    // Read credentials from secure storage and set member variables
+    String? atValue =
+        await _secureStorage.read(key: 'box_dot_com_access_token');
+    String? rtValue =
+        await _secureStorage.read(key: 'box_dot_com_refresh_token');
+    String? ateValue =
+        await _secureStorage.read(key: 'box_dot_com_access_token_expiry');
+
+    // If no credentials have ever been saved, we will start with empty/expired values.
+    // Otherwise, we will set our properties according to what is found.
+    _refreshToken = (rtValue == null || rtValue == '') ? '' : rtValue;
+    ;
+    _accessToken = (atValue == null || atValue == '') ? '' : atValue;
+    ;
+    _accessTokenExpiry = (ateValue == null || ateValue == '')
+        ? DateTime.now()
+        : DateTime.parse(ateValue);
+  }
+
+  /////////////////////////////////////////////////////////////////////////////
+  Future<void> _writeCredentials() async {
+    // Preserve our API credentials, regardless of their state.
+    await _secureStorage.write(
+        key: 'box_dot_com_refresh_token', value: _refreshToken);
+    await _secureStorage.write(
+        key: 'box_dot_com_access_token', value: _accessToken);
+    await _secureStorage.write(
+        key: 'box_dot_com_access_token_expiry',
+        value: _accessTokenExpiry.toIso8601String());
+  }
+
+  /////////////////////////////////////////////////////////////////////////////
   // Will first try to retrieve a refreshToken from secure local storage, but if
   // none or if expired, will attempt an authenticate. It will manage preserving
   // any updated tokens, but will also return it in the Future in case clilents
   // want to drop down a level and make their own calls to the API.
-  Future<String> init() async {
+  //
+  // If successful, the String that is returned is the current access token.
+  // Also, a refresh token is preserrved to the current secure local storage.
+  /////////////////////////////////////////////////////////////////////////////
+  Future<String> authInit() async {
     debugPrint('callbackUrlScheme is $callbackUrlScheme');
     debugPrint('redirectUri is $redirectUri');
     debugPrint('sending this to box.com: $completeAuthUriString');
@@ -180,8 +227,8 @@ class BoxService {
       final response = await http.post(Uri.parse(tokenEndpoint), headers: {
         'Content-type': 'application/x-www-form-urlencoded'
       }, body: {
-        'client_id': clientId,
-        'client_secret': clientSecret,
+        'client_id': _clientId,
+        'client_secret': _clientSecret,
         'code': authCode,
         'grant_type': 'authorization_code',
       });
@@ -202,18 +249,90 @@ class BoxService {
       debugPrint(
           'TODO: Save token to secure local storage and start (Finally) doing real stuff.');
 
+      _accessTokenExpiry = DateTime.now().add(Duration(seconds: expiresIn));
       _accessToken = accessToken;
       _refreshToken = refreshToken;
+    } on PlatformException catch (pe) {
+      debugPrint(
+          'Did not get desired auth. exception message is: ${pe.message}');
+      // Clear all in-memory credentials.
+      _accessToken = '';
+      _refreshToken = '';
+      _accessTokenExpiry = DateTime.now();
+    } finally {
+      // Preserve the credentials.
+      await _writeCredentials();
+    }
 
-      // Preserve the refreshToken
-      await _secureStorage.write(key: 'refresh_token', value: _refreshToken);
+    return _accessToken;
+  }
 
-      return _accessToken;
+  //////////////////////////////////////////////////////////////////////////////
+  //
+  //////////////////////////////////////////////////////////////////////////////
+  Future<String> refreshOrAuthForAccessTokenIfNeeded() async {
+    try {
+      await _readCredentials();
+
+      // If we find we have no entry yet for refresh_token, or if the value
+      // returned is an empty string, let's force an authInit.
+      if (_refreshToken == '') {
+        debugPrint('No preserved refresh_token so we will send to authInit()');
+        _accessToken = await authInit();
+        return _accessToken;
+      }
+
+      // If we find that the current access token is not yet expired, we will
+      // short-circuit here, too, and just return the current access token.
+      final rightNow = DateTime.now();
+      if (_accessTokenExpiry.isAfter(rightNow)) {
+        debugPrint(
+            'The access token does not expire until ${_accessTokenExpiry.toString()}. Keep using it.');
+        // Access token is not expired yet, keep using it.
+        return _accessToken;
+      }
+
+      // If we are here we have a refreshToken in secure storage, but the
+      // access token is or will soon be expired.
+      debugPrint(
+          'The access token has expired or will very soon. Trying a refresh.');
+
+      // Use this code to get a new access token via the refresh token.
+      final response = await http.post(Uri.parse(tokenEndpoint), headers: {
+        'Content-type': 'application/x-www-form-urlencoded'
+      }, body: {
+        'client_id': _clientId,
+        'client_secret': _clientSecret,
+        'refresh_token': _refreshToken,
+        'grant_type': 'refresh_token',
+      });
+
+      dynamic responseBody = jsonDecode(response.body);
+      debugPrint('response body is ${responseBody.toString()}');
+
+      // Get the access token from the response
+      final accessToken = responseBody['access_token'] as String;
+      final expiresIn = responseBody['expires_in'] as int;
+      final refreshToken = responseBody['refresh_token'] as String;
+      final tokenType = responseBody['token_type'] as String;
+      debugPrint('Access token is $accessToken');
+      debugPrint('expires in $expiresIn');
+      debugPrint('refresh token is $refreshToken');
+      debugPrint('token type is $tokenType');
+
+      debugPrint('TODO: Save token to secure local storage.');
+
+      _accessTokenExpiry = DateTime.now().add(Duration(seconds: expiresIn));
+      _accessToken = accessToken;
+      _refreshToken = refreshToken;
     } on PlatformException catch (pe) {
       debugPrint(
           'Did not get desired auth. exception message is: ${pe.message}');
       _accessToken = '';
       _refreshToken = '';
+      _accessTokenExpiry = DateTime.now();
+    } finally {
+      await _writeCredentials();
     }
 
     return _accessToken;
@@ -223,19 +342,20 @@ class BoxService {
   Future<BoxUser> getUser() async {
     const usersMe = '$boxApiRoot/users/me';
 
-    // TODO Check that _accessToken is current first
-    debugPrint('Need to check _accessToken is fresh first');
+    await refreshOrAuthForAccessTokenIfNeeded();
 
-    http.Response res = await http.get(
+    http.Response response = await http.get(
       Uri.parse(usersMe),
       headers: {'authorization': 'Bearer $_accessToken'},
     );
-    if (res.statusCode == 200) {
-      BoxUser result = BoxUser.fromJson(jsonDecode(res.body));
+    if (response.statusCode == 200) {
+      BoxUser result = BoxUser.fromJson(jsonDecode(response.body));
       debugPrint('BoxUser\'s name is ${result.name}');
       return result;
     } else {
-      throw 'Unable to retrieve Box user.';
+      // TODO Maybe we should instead return a null BoxUser?
+      throw Exception(
+          'Unable to retrieve Box user. Response status code was ${response.statusCode}');
     }
   }
 
@@ -243,15 +363,14 @@ class BoxService {
   Future<List<BoxFolderItem>> fetchFolderItems(String inFolderWithId) async {
     final folderItems = '$boxApiRoot/folders/$inFolderWithId/items';
 
-    // TODO Check that _accessToken is current first
-    debugPrint('Need to check _accessToken is fresh first');
+    await refreshOrAuthForAccessTokenIfNeeded();
 
-    http.Response res = await http.get(
+    http.Response response = await http.get(
       Uri.parse(folderItems),
       headers: {'authorization': 'Bearer $_accessToken'},
     );
-    if (res.statusCode == 200) {
-      List<dynamic> body = jsonDecode(res.body)['entries'];
+    if (response.statusCode == 200) {
+      List<dynamic> body = jsonDecode(response.body)['entries'];
       List<BoxFolderItem> result = body
           .map(
             (dynamic item) => BoxFolderItem.fromJson(item),
@@ -261,7 +380,8 @@ class BoxService {
       debugPrint('Number of items is ${result.length}');
       return result;
     } else {
-      throw 'Unable to retrieve items for folder with ID $inFolderWithId.';
+      throw Exception(
+          'Unable to retrieve items for folder with ID $inFolderWithId.');
     }
   }
 
@@ -269,15 +389,14 @@ class BoxService {
   Future<BoxFolderItem> createFolder(String parentFolderId, String name) async {
     const createFolder = '$boxApiRoot/folders';
 
-    // TODO Check that _accessToken is current first
-    debugPrint('Need to check _accessToken is fresh first');
+    await refreshOrAuthForAccessTokenIfNeeded();
 
     final body = jsonEncode({
       'name': name,
       'parent': {'id': parentFolderId}
     });
 
-    http.Response res = await http.post(Uri.parse(createFolder),
+    http.Response response = await http.post(Uri.parse(createFolder),
         headers: <String, String>{
           'authorization': 'Bearer $_accessToken',
           'Content-type': 'application/json'
@@ -285,13 +404,13 @@ class BoxService {
         body: body);
 
     // Success is 201 in this case, not 200.
-    if (res.statusCode == 201) {
-      BoxFolderItem result = BoxFolderItem.fromJson(jsonDecode(res.body));
+    if (response.statusCode == 201) {
+      BoxFolderItem result = BoxFolderItem.fromJson(jsonDecode(response.body));
       debugPrint(
           'New folder created -- name is ${result.name} and id is ${result.id}');
       return result;
     } else {
-      debugPrint('Error code is ${res.statusCode}');
+      debugPrint('Error code is ${response.statusCode}');
       throw Exception(
           'Unable to create folder with parent $parentFolderId with name $name');
     }
@@ -348,10 +467,9 @@ class BoxService {
   //////////////////////////////////////////////////////////////////////////////
   Future<BoxFolderItem> uploadFile(String localPathname, String simpleFilename,
       String parentFolderId) async {
-    // TODO Check that _accessToken is current first
-    debugPrint('Need to check _accessToken is fresh first');
-
     const uploadFileUriString = 'https://upload.box.com/api/2.0/files/content';
+
+    await refreshOrAuthForAccessTokenIfNeeded();
 
     //create multipart request for POST or PATCH method
     var request = http.MultipartRequest("POST", Uri.parse(uploadFileUriString));

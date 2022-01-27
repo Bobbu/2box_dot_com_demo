@@ -1,4 +1,4 @@
-import 'dart:io';
+// import 'dart:io';
 
 import 'package:flutter/material.dart';
 // import 'package:flutter_web_auth/flutter_web_auth.dart';
@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import './services/box_service.dart';
+import './utilities/random_in_range.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,7 +22,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Box.com Demo',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.deepPurple,
       ),
       home: const MyHomePage(title: 'Box.com Demo'),
     );
@@ -39,15 +40,44 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   String _connectionState = 'Not authed yet at Box.com';
-  bool _isAuthed = false;
   String _someTellTaleInfo = 'I have no idea what folders and files exist';
 
   BoxService boxService = BoxService();
 
   final _folderNameController = TextEditingController();
+  bool _enableCreateNewFolderButton = false;
+
+  void _toggleCreateNewFolderButton() {
+    // Only change state if we are going from having some text to no text or
+    // vice versa. Ignore all cses where we are just changing text (already
+    // enabled and text continues to not be empty).
+    if (_enableCreateNewFolderButton && _folderNameController.text.isEmpty) {
+      setState(() {
+        _enableCreateNewFolderButton = false;
+      });
+    } else if (!_enableCreateNewFolderButton &&
+        _folderNameController.text.isNotEmpty) {
+      setState(() {
+        _enableCreateNewFolderButton = true;
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Not waiting for it...
+    boxService.getUser().then((resultingUser) {
+      setState(() {
+        _connectionState = 'Logged in at Box as ${resultingUser.name}';
+      });
+    });
+
+    _folderNameController.addListener(_toggleCreateNewFolderButton);
+  }
 
   void _authenticate() async {
-    String accessToken = await boxService.init();
+    String accessToken = await boxService.authInit();
 
     debugPrint(accessToken);
 
@@ -56,12 +86,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
       setState(() {
         _connectionState = 'Connected (${bu.name})';
-        _isAuthed = true;
       });
     } else {
       setState(() {
         _connectionState = 'Failed to connect (real)';
-        _isAuthed = false;
       });
     }
   }
@@ -70,8 +98,11 @@ class _MyHomePageState extends State<MyHomePage> {
     List<BoxFolderItem> rootItems = await boxService.fetchFolderItems('0');
     if (rootItems.isNotEmpty) {
       setState(() {
-        final name = rootItems[0].name;
-        final type = rootItems[0].type;
+        int index = Randomizer.nextIntInRange(0, rootItems.length - 1);
+        debugPrint(
+            'There are ${rootItems.length} items in root folder and we randomly will show $index');
+        final name = rootItems[index].name;
+        final type = rootItems[index].type;
         _someTellTaleInfo = 'There is a $type named $name';
       });
     } else {
@@ -199,11 +230,11 @@ class _MyHomePageState extends State<MyHomePage> {
                     child: const Text('Try to auth at Box.com')),
                 const SizedBox(width: 10),
                 ElevatedButton(
-                    onPressed: _isAuthed ? _getSomeTelltaleInfo : null,
+                    onPressed: _getSomeTelltaleInfo,
                     child: const Text('Grab some telltale info')),
                 const SizedBox(width: 10),
                 ElevatedButton(
-                    onPressed: _isAuthed ? _createRandomlyNamedFolder : null,
+                    onPressed: _createRandomlyNamedFolder,
                     child: const Text('Create randomly-named folder')),
                 const SizedBox(width: 20),
                 TextField(
@@ -212,12 +243,13 @@ class _MyHomePageState extends State<MyHomePage> {
                   controller: _folderNameController,
                 ),
                 ElevatedButton(
-                    onPressed: _isAuthed ? _createNewFolder : null,
+                    onPressed: (_enableCreateNewFolderButton)
+                        ? _createNewFolder
+                        : null,
                     child: const Text('Create new folder')),
                 const SizedBox(width: 10),
                 ElevatedButton(
-                    onPressed: _isAuthed ? _uploadFile : null,
-                    child: const Text('Upload a file')),
+                    onPressed: _uploadFile, child: const Text('Upload a file')),
               ],
             ),
           ],
