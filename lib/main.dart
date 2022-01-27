@@ -63,6 +63,12 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  void _clearFolderNameText() {
+    setState(() {
+      _folderNameController.clear();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -204,56 +210,79 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    ButtonStyle consistentSizeButtonStyle = ElevatedButton.styleFrom(
+        minimumSize: const Size(250, 40), maximumSize: const Size(250, 40));
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: <Widget>[
-            const SizedBox(height: 20),
-            Text(
-              _connectionState,
-              style: Theme.of(context).textTheme.headline5,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _someTellTaleInfo,
-            ),
-            const SizedBox(height: 20),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                    onPressed: _authenticate,
-                    child: const Text('Try to auth at Box.com')),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                    onPressed: _getSomeTelltaleInfo,
-                    child: const Text('Grab some telltale info')),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                    onPressed: _createRandomlyNamedFolder,
-                    child: const Text('Create randomly-named folder')),
-                const SizedBox(width: 20),
-                TextField(
-                  decoration:
-                      const InputDecoration(labelText: 'New Folder Name'),
-                  controller: _folderNameController,
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: <Widget>[
+                    const SizedBox(height: 20),
+                    Text(
+                      _connectionState,
+                      style: Theme.of(context).textTheme.headline5,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      _someTellTaleInfo,
+                      style: Theme.of(context).textTheme.headline6,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                        style: consistentSizeButtonStyle,
+                        onPressed: _authenticate,
+                        child: const Text('Try to auth at Box.com')),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                        style: consistentSizeButtonStyle,
+                        onPressed: _getSomeTelltaleInfo,
+                        child: const Text('Grab some telltale info')),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                        style: consistentSizeButtonStyle,
+                        onPressed: _createRandomlyNamedFolder,
+                        child: const Text('Create randomly-named folder')),
+                    const SizedBox(width: 20),
+                    TextField(
+                      decoration: InputDecoration(
+                        labelText: 'New Folder Name',
+                        suffixIcon: IconButton(
+                          // Icon to
+                          icon: const Icon(Icons.clear), // clear text
+                          onPressed: _clearFolderNameText,
+                        ),
+                      ),
+                      controller: _folderNameController,
+                    ),
+                    ElevatedButton(
+                        style: consistentSizeButtonStyle,
+                        onPressed: (_enableCreateNewFolderButton)
+                            ? _createNewFolder
+                            : null,
+                        child: const Text('Create new folder')),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                        style: consistentSizeButtonStyle,
+                        onPressed: _uploadFile,
+                        child: const Text('Upload a file')),
+                  ],
                 ),
-                ElevatedButton(
-                    onPressed: (_enableCreateNewFolderButton)
-                        ? _createNewFolder
-                        : null,
-                    child: const Text('Create new folder')),
-                const SizedBox(width: 10),
-                ElevatedButton(
-                    onPressed: _uploadFile, child: const Text('Upload a file')),
-              ],
+              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
