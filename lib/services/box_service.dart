@@ -1,5 +1,4 @@
-import 'dart:convert' show jsonDecode, jsonEncode;
-// import 'dart:io'; // for uploadFile
+import 'dart:convert' show jsonDecode, jsonEncode, JsonEncoder;
 import 'package:flutter_web_auth/flutter_web_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -11,10 +10,10 @@ import 'package:http/http.dart' as http;
 // In this package, we define several basic abstractions, including BoxUser and
 // BoxFolderItem, as well as the base service, BoxService. Each of these
 // abstractions are effectively a subset of those provided by the Box.com API
-// that is available through developer.box.com. Note that BoxService is fra from
+// that is available through developer.box.com. Note that BoxService is far from
 // an exhaustive SDK.
 //
-//
+// Rob. January 2022
 ///////////////////////////////////////////////////////////////////////////////
 
 class BoxUser {
@@ -101,6 +100,7 @@ class BoxFolderItem {
     required this.sequenceId,
     required this.etag,
     required this.name,
+    required this.tags,
   });
 
   final String type;
@@ -108,21 +108,24 @@ class BoxFolderItem {
   final String sequenceId;
   final String etag;
   final String name;
+  final List<String> tags;
 
   factory BoxFolderItem.fromJson(Map<String, dynamic> json) => BoxFolderItem(
-        type: json["type"],
-        id: json["id"],
-        sequenceId: json["sequence_id"],
-        etag: json["etag"],
-        name: json["name"],
+        type: json['type'],
+        id: json['id'],
+        sequenceId: json['sequence_id'],
+        etag: json['etag'],
+        name: json['name'],
+        tags: List<String>.from(json['tags'].map((x) => x)),
       );
 
   Map<String, dynamic> toJson() => {
-        "type": type,
-        "id": id,
-        "sequence_id": sequenceId,
-        "etag": etag,
-        "name": name,
+        'type': type,
+        'id': id,
+        'sequence_id': sequenceId,
+        'etag': etag,
+        'name': name,
+        'tags': List<dynamic>.from(tags.map((x) => x)),
       };
 }
 
@@ -176,9 +179,7 @@ class BoxService {
     // If no credentials have ever been saved, we will start with empty/expired values.
     // Otherwise, we will set our properties according to what is found.
     _refreshToken = (rtValue == null || rtValue == '') ? '' : rtValue;
-    ;
     _accessToken = (atValue == null || atValue == '') ? '' : atValue;
-    ;
     _accessTokenExpiry = (ateValue == null || ateValue == '')
         ? DateTime.now()
         : DateTime.parse(ateValue);
@@ -206,9 +207,9 @@ class BoxService {
   // Also, a refresh token is preserrved to the current secure local storage.
   /////////////////////////////////////////////////////////////////////////////
   Future<String> authInit() async {
-    debugPrint('callbackUrlScheme is $callbackUrlScheme');
-    debugPrint('redirectUri is $redirectUri');
-    debugPrint('sending this to box.com: $completeAuthUriString');
+    debugPrint('''callbackUrlScheme is $callbackUrlScheme
+      redirectUri is $redirectUri
+      sending this to box.com: $completeAuthUriString''');
 
     // Present the dialog to the user
 
@@ -234,24 +235,18 @@ class BoxService {
       });
 
       dynamic responseBody = jsonDecode(response.body);
-      debugPrint('response body is ${responseBody.toString()}');
+
+      if (kDebugMode) {
+        JsonEncoder encoder = const JsonEncoder.withIndent('  ');
+        String prettyprintResp = encoder.convert(responseBody);
+        debugPrint(prettyprintResp);
+      }
 
       // Get the access token from the response
-      final accessToken = responseBody['access_token'] as String;
+      _accessToken = responseBody['access_token'] as String;
+      _refreshToken = responseBody['refresh_token'] as String;
       final expiresIn = responseBody['expires_in'] as int;
-      final refreshToken = responseBody['refresh_token'] as String;
-      final tokenType = responseBody['token_type'] as String;
-      debugPrint('Access token is $accessToken');
-      debugPrint('expires in $expiresIn');
-      debugPrint('refresh token is $refreshToken');
-      debugPrint('token type is $tokenType');
-
-      debugPrint(
-          'TODO: Save token to secure local storage and start (Finally) doing real stuff.');
-
       _accessTokenExpiry = DateTime.now().add(Duration(seconds: expiresIn));
-      _accessToken = accessToken;
-      _refreshToken = refreshToken;
     } on PlatformException catch (pe) {
       debugPrint(
           'Did not get desired auth. exception message is: ${pe.message}');
@@ -308,23 +303,18 @@ class BoxService {
       });
 
       dynamic responseBody = jsonDecode(response.body);
-      debugPrint('response body is ${responseBody.toString()}');
+
+      if (kDebugMode) {
+        JsonEncoder encoder = const JsonEncoder.withIndent('  ');
+        String prettyprintResp = encoder.convert(responseBody);
+        debugPrint(prettyprintResp);
+      }
 
       // Get the access token from the response
-      final accessToken = responseBody['access_token'] as String;
+      _accessToken = responseBody['access_token'] as String;
+      _refreshToken = responseBody['refresh_token'] as String;
       final expiresIn = responseBody['expires_in'] as int;
-      final refreshToken = responseBody['refresh_token'] as String;
-      final tokenType = responseBody['token_type'] as String;
-      debugPrint('Access token is $accessToken');
-      debugPrint('expires in $expiresIn');
-      debugPrint('refresh token is $refreshToken');
-      debugPrint('token type is $tokenType');
-
-      debugPrint('TODO: Save token to secure local storage.');
-
       _accessTokenExpiry = DateTime.now().add(Duration(seconds: expiresIn));
-      _accessToken = accessToken;
-      _refreshToken = refreshToken;
     } on PlatformException catch (pe) {
       debugPrint(
           'Did not get desired auth. exception message is: ${pe.message}');
@@ -339,7 +329,8 @@ class BoxService {
   }
 
   //////////////////////////////////////////////////////////////////////////////
-  Future<BoxUser> getUser() async {
+  // Returns null if any errors or if auth is bailed.
+  Future<BoxUser?> getUser() async {
     const usersMe = '$boxApiRoot/users/me';
 
     await refreshOrAuthForAccessTokenIfNeeded();
@@ -353,25 +344,40 @@ class BoxService {
       debugPrint('BoxUser\'s name is ${result.name}');
       return result;
     } else {
-      // TODO Maybe we should instead return a null BoxUser?
-      throw Exception(
+      debugPrint(
           'Unable to retrieve Box user. Response status code was ${response.statusCode}');
+      return null;
     }
   }
 
   //////////////////////////////////////////////////////////////////////////////
-  Future<List<BoxFolderItem>> fetchFolderItems(String inFolderWithId) async {
-    final folderItems = '$boxApiRoot/folders/$inFolderWithId/items';
+  Future<List<BoxFolderItem>> fetchFolderItems(
+      {required final String inFolderWithId}) async {
+    const fieldsPortion = '?fields=id,type,name,etag,sequence_id,tags';
+
+    final folderItems =
+        '$boxApiRoot/folders/$inFolderWithId/items$fieldsPortion';
 
     await refreshOrAuthForAccessTokenIfNeeded();
+
+    // final body = jsonEncode({
+    //   'fields': ['id', 'sequence_id', 'name', 'type', 'etag', 'tags']
+    // });
 
     http.Response response = await http.get(
       Uri.parse(folderItems),
       headers: {'authorization': 'Bearer $_accessToken'},
     );
     if (response.statusCode == 200) {
-      List<dynamic> body = jsonDecode(response.body)['entries'];
-      List<BoxFolderItem> result = body
+      List<dynamic> responseBody = jsonDecode(response.body)['entries'];
+
+      if (kDebugMode) {
+        JsonEncoder encoder = const JsonEncoder.withIndent('  ');
+        String prettyprintResp = encoder.convert(responseBody);
+        debugPrint(prettyprintResp);
+      }
+
+      List<BoxFolderItem> result = responseBody
           .map(
             (dynamic item) => BoxFolderItem.fromJson(item),
           )
@@ -386,7 +392,9 @@ class BoxService {
   }
 
   //////////////////////////////////////////////////////////////////////////////
-  Future<BoxFolderItem> createFolder(String parentFolderId, String name) async {
+  // Returns null if creation fails.
+  Future<BoxFolderItem?> createFolder(
+      {required String name, required String parentFolderId}) async {
     const createFolder = '$boxApiRoot/folders';
 
     await refreshOrAuthForAccessTokenIfNeeded();
@@ -408,21 +416,25 @@ class BoxService {
       BoxFolderItem result = BoxFolderItem.fromJson(jsonDecode(response.body));
       debugPrint(
           'New folder created -- name is ${result.name} and id is ${result.id}');
+
       return result;
     } else {
-      debugPrint('Error code is ${response.statusCode}');
-      throw Exception(
-          'Unable to create folder with parent $parentFolderId with name $name');
+      debugPrint('''Error code is ${response.statusCode}
+        Unable to create folder with parent $parentFolderId with name $name''');
+
+      return null;
     }
   }
 
   //////////////////////////////////////////////////////////////////////////////
 
   Future<bool> itemExists(
-      final String name, final String inFolderWithId) async {
+      {required final String name,
+      required final String inFolderWithId}) async {
     bool result = false;
 
-    List<BoxFolderItem> items = await fetchFolderItems(inFolderWithId);
+    List<BoxFolderItem> items =
+        await fetchFolderItems(inFolderWithId: inFolderWithId);
 
     // Likely a map/list function could be used to compare only name property
     // but did not see it at the time I wrote this.
@@ -445,10 +457,12 @@ class BoxService {
   // match is not found.
   //
   Future<BoxFolderItem?> itemWithName(
-      final String name, final String inFolderWithId) async {
+      {required final String name,
+      required final String inFolderWithId}) async {
     BoxFolderItem? result;
 
-    List<BoxFolderItem> items = await fetchFolderItems(inFolderWithId);
+    List<BoxFolderItem> items =
+        await fetchFolderItems(inFolderWithId: inFolderWithId);
 
     // Likely a map/list function could be used to compare only name property
     // but did not see it at the time I wrote this.
@@ -465,14 +479,16 @@ class BoxService {
   }
 
   //////////////////////////////////////////////////////////////////////////////
-  Future<BoxFolderItem> uploadFile(String localPathname, String simpleFilename,
-      String parentFolderId) async {
+  Future<BoxFolderItem?> uploadFile(
+      {required final String localPathname,
+      required final String simpleFilename,
+      required final String parentFolderId}) async {
     const uploadFileUriString = 'https://upload.box.com/api/2.0/files/content';
 
     await refreshOrAuthForAccessTokenIfNeeded();
 
     //create multipart request for POST or PATCH method
-    var request = http.MultipartRequest("POST", Uri.parse(uploadFileUriString));
+    var request = http.MultipartRequest('POST', Uri.parse(uploadFileUriString));
 
     final attributes = jsonEncode({
       'name': simpleFilename,
@@ -486,7 +502,7 @@ class BoxService {
     request.fields['attributes'] = attributes;
 
     var fileToUpload =
-        await http.MultipartFile.fromPath("file_field", localPathname);
+        await http.MultipartFile.fromPath('file_field', localPathname);
     //add multipart to request
     request.files.add(fileToUpload);
     var response = await request.send();
@@ -511,11 +527,11 @@ class BoxService {
 
       return result;
     } else {
-      debugPrint('Error code is ${response.statusCode}');
-      debugPrint('Error is ${response.reasonPhrase}');
+      debugPrint('''Error code is ${response.statusCode}
+        Error reasonPhrase is ${response.reasonPhrase}
+        Unable to upload $localPathname to $simpleFilename in parent folder $parentFolderId''');
 
-      throw Exception(
-          'Unable to upload $localPathname to $simpleFilename in parent folder $parentFolderId');
+      return null;
     }
   }
 }

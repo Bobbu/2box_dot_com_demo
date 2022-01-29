@@ -1,14 +1,10 @@
-// import 'dart:io';
-
 import 'package:flutter/material.dart';
-// import 'package:flutter_web_auth/flutter_web_auth.dart';
-// import 'package:flutter/services.dart';
-// import 'dart:convert' show jsonDecode;
-// import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_breadcrumb/flutter_breadcrumb.dart';
 import './services/box_service.dart';
 import './utilities/random_in_range.dart';
+import './pages/box_explorer.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,16 +16,20 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Box.com Demo',
-      theme: ThemeData(
-        primarySwatch: Colors.deepOrange,
-      ),
-      home: const MyHomePage(title: 'Box.com Demo'),
-    );
+        title: 'Box.com Demo',
+        theme: ThemeData(
+          primarySwatch: Colors.deepOrange,
+        ),
+        routes: {
+          MyHomePage.routeName: (ctx) => const MyHomePage(title: 'Box Driver'),
+          BoxExplorer.routeName: (ctx) => const BoxExplorer(),
+        });
   }
 }
 
 class MyHomePage extends StatefulWidget {
+  static const routeName = '/';
+
   const MyHomePage({Key? key, required this.title}) : super(key: key);
 
   final String title;
@@ -72,11 +72,12 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
-    // Not waiting for it...
     boxService.getUser().then((resultingUser) {
-      setState(() {
-        _connectionState = 'Logged in at Box as ${resultingUser.name}';
-      });
+      if (resultingUser != null) {
+        setState(() {
+          _connectionState = 'Logged in at Box as ${resultingUser.name}';
+        });
+      }
     });
 
     _folderNameController.addListener(_toggleCreateNewFolderButton);
@@ -88,7 +89,11 @@ class _MyHomePageState extends State<MyHomePage> {
     debugPrint(accessToken);
 
     if (accessToken != '') {
-      BoxUser bu = await boxService.getUser();
+      BoxUser? bu = await boxService.getUser();
+
+      if (bu == null) {
+        return;
+      }
 
       setState(() {
         _connectionState = 'Connected (${bu.name})';
@@ -101,7 +106,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _getSomeTelltaleInfo() async {
-    List<BoxFolderItem> rootItems = await boxService.fetchFolderItems('0');
+    List<BoxFolderItem> rootItems =
+        await boxService.fetchFolderItems(inFolderWithId: '0');
     if (rootItems.isNotEmpty) {
       setState(() {
         int index = Randomizer.nextIntInRange(0, rootItems.length - 1);
@@ -123,8 +129,14 @@ class _MyHomePageState extends State<MyHomePage> {
     final String randomEnoughName = 'rando' + formatter.format(DateTime.now());
     debugPrint(randomEnoughName);
     try {
-      BoxFolderItem newFolder =
-          await boxService.createFolder('0', randomEnoughName);
+      BoxFolderItem? newFolder = await boxService.createFolder(
+          name: randomEnoughName, parentFolderId: '0');
+
+      if (newFolder == null) {
+        debugPrint('*** Unsuccessful create of folder');
+        return;
+      }
+
       final message =
           'Created folder named ${newFolder.name} with Id ${newFolder.id}';
       debugPrint(message);
@@ -146,8 +158,8 @@ class _MyHomePageState extends State<MyHomePage> {
     final String newFolderName = _folderNameController.text;
     const String rootFolderId = '0';
 
-    bool itemAlreadyExists =
-        await boxService.itemExists(newFolderName, rootFolderId);
+    bool itemAlreadyExists = await boxService.itemExists(
+        name: newFolderName, inFolderWithId: rootFolderId);
     if (itemAlreadyExists) {
       setState(() {
         _someTellTaleInfo = '$newFolderName already exists in root folder!!!';
@@ -156,8 +168,16 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     try {
-      BoxFolderItem newFolder =
-          await boxService.createFolder(rootFolderId, newFolderName);
+      BoxFolderItem? newFolder = await boxService.createFolder(
+        name: newFolderName,
+        parentFolderId: rootFolderId,
+      );
+
+      if (newFolder == null) {
+        debugPrint('*** Unsuccessful create of folder');
+        return;
+      }
+
       final message =
           'Created folder named ${newFolder.name} with Id ${newFolder.id}';
       debugPrint(message);
@@ -186,8 +206,15 @@ class _MyHomePageState extends State<MyHomePage> {
         _someTellTaleInfo = 'Going to upload ${file.name} at path ${file.path}';
       });
       try {
-        BoxFolderItem uploadedFile =
-            await boxService.uploadFile(file.path!, file.name, '0');
+        BoxFolderItem? uploadedFile = await boxService.uploadFile(
+            localPathname: file.path!,
+            simpleFilename: file.name,
+            parentFolderId: '0');
+
+        if (uploadedFile == null) {
+          debugPrint('*** Unsuccessful upload of file');
+          return;
+        }
         setState(() {
           _someTellTaleInfo =
               'Uploaded file ${uploadedFile.name} in the root folder';
@@ -206,6 +233,20 @@ class _MyHomePageState extends State<MyHomePage> {
         _someTellTaleInfo = 'User cancelled file selection';
       });
     }
+  }
+
+  void _exploreBox() {
+    BreadCrumbItem bci = BreadCrumbItem(content: const Text('All Files'));
+    BreadCrumb bc = BreadCrumb(
+        items: [bci],
+        divider: const Icon(Icons.chevron_right),
+        overflow: ScrollableOverflow(
+          keepLastDivider: false,
+          reverse: false,
+          direction: Axis.horizontal,
+        ));
+    Navigator.pushNamed(context, BoxExplorer.routeName,
+        arguments: {'folderId': '0'});
   }
 
   @override
@@ -277,6 +318,11 @@ class _MyHomePageState extends State<MyHomePage> {
                         style: consistentSizeButtonStyle,
                         onPressed: _uploadFile,
                         child: const Text('Upload a file')),
+                    const SizedBox(width: 10),
+                    ElevatedButton(
+                        style: consistentSizeButtonStyle,
+                        onPressed: _exploreBox,
+                        child: const Text('Explore Box')),
                   ],
                 ),
               ),
