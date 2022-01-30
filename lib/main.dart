@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_breadcrumb/flutter_breadcrumb.dart';
 import './services/box_service.dart';
 import './utilities/random_in_range.dart';
-import './pages/box_explorer.dart';
+import './pages/box_explorer_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -22,7 +21,7 @@ class MyApp extends StatelessWidget {
         ),
         routes: {
           MyHomePage.routeName: (ctx) => const MyHomePage(title: 'Box Driver'),
-          BoxExplorer.routeName: (ctx) => const BoxExplorer(),
+          BoxExplorerPage.routeName: (ctx) => const BoxExplorerPage(),
         });
   }
 }
@@ -236,17 +235,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _exploreBox() {
-    BreadCrumbItem bci = BreadCrumbItem(content: const Text('All Files'));
-    BreadCrumb bc = BreadCrumb(
-        items: [bci],
-        divider: const Icon(Icons.chevron_right),
-        overflow: ScrollableOverflow(
-          keepLastDivider: false,
-          reverse: false,
-          direction: Axis.horizontal,
-        ));
-    Navigator.pushNamed(context, BoxExplorer.routeName,
-        arguments: {'folderId': '0'});
+    Navigator.pushNamed(context, BoxExplorerPage.routeName,
+        arguments: {'folderId': '0', 'folderName': 'All Files'});
   }
 
   @override

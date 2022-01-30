@@ -94,14 +94,15 @@ class BoxUser {
 /////////////////////////////////////////////////////////////////////////
 
 class BoxFolderItem {
-  BoxFolderItem({
-    required this.type,
-    required this.id,
-    required this.sequenceId,
-    required this.etag,
-    required this.name,
-    required this.tags,
-  });
+  BoxFolderItem(
+      {required this.type,
+      required this.id,
+      required this.sequenceId,
+      required this.etag,
+      required this.name,
+      required this.tags,
+      required this.createdAt,
+      required this.modifiedAt});
 
   final String type;
   final String id;
@@ -109,6 +110,8 @@ class BoxFolderItem {
   final String etag;
   final String name;
   final List<String> tags;
+  final DateTime createdAt;
+  final DateTime modifiedAt;
 
   factory BoxFolderItem.fromJson(Map<String, dynamic> json) => BoxFolderItem(
         type: json['type'],
@@ -117,6 +120,8 @@ class BoxFolderItem {
         etag: json['etag'],
         name: json['name'],
         tags: List<String>.from(json['tags'].map((x) => x)),
+        createdAt: DateTime.parse(json['created_at']),
+        modifiedAt: DateTime.parse(json['modified_at']),
       );
 
   Map<String, dynamic> toJson() => {
@@ -126,6 +131,8 @@ class BoxFolderItem {
         'etag': etag,
         'name': name,
         'tags': List<dynamic>.from(tags.map((x) => x)),
+        'created_at': createdAt.toIso8601String(),
+        'modified_at': modifiedAt.toIso8601String(),
       };
 }
 
@@ -353,7 +360,8 @@ class BoxService {
   //////////////////////////////////////////////////////////////////////////////
   Future<List<BoxFolderItem>> fetchFolderItems(
       {required final String inFolderWithId}) async {
-    const fieldsPortion = '?fields=id,type,name,etag,sequence_id,tags';
+    const fieldsPortion =
+        '?fields=id,type,name,etag,sequence_id,tags,created_at,modified_at';
 
     final folderItems =
         '$boxApiRoot/folders/$inFolderWithId/items$fieldsPortion';
@@ -361,7 +369,16 @@ class BoxService {
     await refreshOrAuthForAccessTokenIfNeeded();
 
     // final body = jsonEncode({
-    //   'fields': ['id', 'sequence_id', 'name', 'type', 'etag', 'tags']
+    //   'fields': [
+    //     'id',
+    //     'sequence_id',
+    //     'name',
+    //     'type',
+    //     'etag',
+    //     'tags',
+    //     'created_at',
+    //     'modified_at'
+    //   ]
     // });
 
     http.Response response = await http.get(
