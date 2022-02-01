@@ -23,7 +23,6 @@ https://pub.dev/packages/flutter_web_auth
 This is how we store access and refresh tokens locally and securelly.
 
 for more, visit:
-
 https://pub.dev/packages/flutter_secure_storage
 
 See the publspec.yaml file for other less crucial dependencies.
