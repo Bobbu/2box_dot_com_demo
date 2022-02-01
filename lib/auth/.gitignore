@@ -6,7 +6,8 @@
 #
 # import '../auth/secrets.dart';
 #   ...
-#    const clientId = '$Secrets.appXyxClientId';
+#    const _clientId = MyAppSecrets.appXyxClientId;
+#
 # NOTE: There still may be an issue with hackers possibly reverse engineering
 #       deployed code, so we should look into other obfuscation measures.
 secrets.dart
