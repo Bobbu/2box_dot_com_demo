@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import '../auth/secrets.dart';
+
 ///////////////////////////////////////////////////////////////////////////////
 //
 // In this package, we define several basic abstractions, including BoxUser and
@@ -146,9 +148,9 @@ class BoxService {
   // Some constants
   //
 
-  // Client App IDs (Should likely hide)
-  static const _clientId = 'dbneallex3uliy7zo7xtkvj380v935ux';
-  static const _clientSecret = 'NgwLcqY66W2TyrUHFjVl2J9ylm2N9WV0';
+  // Client App IDs (getting from secrets.dart)
+  static const _clientId = MyAppSecrets.boxClientId;
+  static const _clientSecret = MyAppSecrets.boxClientSecret;
 
   // Oauth2
   static const oauth2Root = 'https://account.box.com/api/oauth2';

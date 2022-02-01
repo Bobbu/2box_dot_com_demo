@@ -1,0 +1,12 @@
+# We are git ignoring secrets.dart as it will contain all the API keys and 
+# their secrets.
+#
+# It is important that clients of this will import the secrets.dart 
+# file, and then reference the constants in string interpolation such as:
+#
+# import '../auth/secrets.dart';
+#   ...
+#    const clientId = '$Secrets.appXyxClientId';
+# NOTE: There still may be an issue with hackers possibly reverse engineering
+#       deployed code, so we should look into other obfuscation measures.
+secrets.dart
