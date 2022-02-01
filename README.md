@@ -30,4 +30,9 @@ See the publspec.yaml file for other less crucial dependencies.
 ## API and potentially other Secrets
 
 We use a git-ignored secrets.dart in lib/auth/secrets.dart to store the API client ID and secret ID.
-Anyone employing this will want to create their own lib/auth/secrets.dart. Any ideas on how to improve this? I am all ears.
+Anyone employing this will want to create their own lib/auth/secrets.dart. 
+
+This was based off this post on Medium.com:
+https://medium.com/podiihq/keeping-secret-keys-out-of-version-control-in-flutter-bcd2b1eb9c1b
+
+Any ideas on how to improve this? I am all ears.
