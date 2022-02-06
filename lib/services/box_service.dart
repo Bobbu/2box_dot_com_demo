@@ -391,6 +391,8 @@ class BoxService {
       List<dynamic> responseBody = jsonDecode(response.body)['entries'];
 
       if (kDebugMode) {
+        debugPrint(
+            'This is what we get when we jsonDecode(response.body)[\'entries\']');
         JsonEncoder encoder = const JsonEncoder.withIndent('  ');
         String prettyprintResp = encoder.convert(responseBody);
         debugPrint(prettyprintResp);
@@ -414,7 +416,10 @@ class BoxService {
   // Returns null if creation fails.
   Future<BoxFolderItem?> createFolder(
       {required String name, required String parentFolderId}) async {
-    const createFolder = '$boxApiRoot/folders';
+    const fieldsPortion =
+        '?fields=id,type,name,etag,sequence_id,tags,created_at,modified_at';
+
+    const createFolder = '$boxApiRoot/folders$fieldsPortion';
 
     await refreshOrAuthForAccessTokenIfNeeded();
 

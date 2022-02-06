@@ -32,6 +32,18 @@ extension DateTimeExtension on DateTime {
     return formattedDate;
   }
 
+  String asShortDateString() {
+    final DateFormat formatter = DateFormat('M/d/yyyy');
+    final String formattedDate = formatter.format(this);
+    return formattedDate;
+  }
+
+  String asSortableDateString() {
+    final DateFormat formatter = DateFormat('yyyy-MM-dd');
+    final String formattedDate = formatter.format(this);
+    return formattedDate;
+  }
+
   String asFilenameString() {
     final DateFormat dateFormatter = DateFormat('yyyy-MM-dd');
     final DateFormat timeFormatter = DateFormat('H-mm-ss');
