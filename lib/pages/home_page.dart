@@ -19,7 +19,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String _connectionState = 'Not authed yet at Box.com';
-  String _someTellTaleInfo = 'I have no idea what folders and files exist';
+  String _someTellTaleInfo = 'No idea what folders and files exist';
 
   //BoxService boxService = BoxService();
 
@@ -245,6 +245,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     ButtonStyle consistentSizeButtonStyle = ElevatedButton.styleFrom(
         minimumSize: const Size(250, 40), maximumSize: const Size(250, 40));
+    _showLoggedInState();
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),

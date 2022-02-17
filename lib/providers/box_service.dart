@@ -204,6 +204,11 @@ class BoxService with ChangeNotifier {
     notifyListeners();
   }
 
+  BoxService() {
+    _readCredentials()
+        .then((value) => _fetchAndSetCurrentBoxUser().then((value) => null));
+  }
+
   //////////////////////////////////////////////////////////////////////////////
   // Returns null if any errors or if auth is bailed.
   Future<BoxUser?> _fetchAndSetCurrentBoxUser() async {
