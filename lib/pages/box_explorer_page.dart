@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_breadcrumb/flutter_breadcrumb.dart';
-import '../services/box_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/box_service.dart';
 import '../utilities/date_time_extension.dart';
 
 class BoxExplorerPage extends StatefulWidget {
@@ -13,7 +14,7 @@ class BoxExplorerPage extends StatefulWidget {
 }
 
 class _BoxExplorerPageState extends State<BoxExplorerPage> {
-  final boxService = BoxService();
+  // final boxService = BoxService();
 
   bool _isInit = true;
 
@@ -126,7 +127,8 @@ class _BoxExplorerPageState extends State<BoxExplorerPage> {
       child: Scaffold(
         appBar: AppBar(title: Text(_folderName)),
         body: FutureBuilder(
-          future: boxService.fetchFolderItems(inFolderWithId: _folderId),
+          future: Provider.of<BoxService>(context, listen: false)
+              .fetchFolderItems(inFolderWithId: _folderId),
           builder: (BuildContext context,
               AsyncSnapshot<List<BoxFolderItem>> snapshot) {
             if (snapshot.hasData) {

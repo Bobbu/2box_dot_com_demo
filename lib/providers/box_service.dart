@@ -138,8 +138,27 @@ class BoxFolderItem {
       };
 }
 
+///////////////////////////////////////////////////////////////////////////////
+///
+/// Just a specific exception we may see thrown from any of the methods in the
+/// BoxService.
+///
+///
+class BoxServiceException implements Exception {
+  final String message;
+
+  BoxServiceException(this.message);
+
+  @override
+  String toString() {
+    return message;
+
+    /// return super.toString(); /// Instance of BoxServiceException
+  }
+}
+
 //////////////////////////////////////////////////////////////////////////////
-class BoxService {
+class BoxService with ChangeNotifier {
   // We will store refreshToken and possibly more credentials here.
   // See https://pub.dev/packages/flutter_secure_storage
   //
@@ -156,6 +175,8 @@ class BoxService {
   static const oauth2Root = 'https://account.box.com/api/oauth2';
   static const authorizationEndpoint = '$oauth2Root/authorize';
   static const tokenEndpoint = '$oauth2Root/token';
+  static const revokeEndpoint = 'https://api.box.com/oauth2/revoke';
+
   // callbackUrlScheme also goes in <approot>/android/app/src/AndroidManifest.xml
   static const callbackUrlScheme = 'hrp01';
   // The redirect URI must match what is defined at developer.box.com:
@@ -169,11 +190,61 @@ class BoxService {
   // Finally, for Box API
   static const boxApiRoot = 'https://api.box.com/2.0';
 
-  // We'll manage these for clients. If they are blank we can assume an auth
-  // must occur.
+  /// Private property to current authenticated and authorized user.
+  BoxUser? _currentBoxUser;
+
+  /// public getter
+  BoxUser? get currentUser {
+    return _currentBoxUser;
+  }
+
+  /// private setter (with notify)
+  set _currentUser(BoxUser? toBe) {
+    _currentBoxUser = toBe;
+    notifyListeners();
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Returns null if any errors or if auth is bailed.
+  Future<BoxUser?> _fetchAndSetCurrentBoxUser() async {
+    const usersMe = '$boxApiRoot/users/me';
+
+    // String trash = await refreshOrAuthForAccessTokenIfNeeded();
+
+    http.Response response = await http.get(
+      Uri.parse(usersMe),
+      headers: {'authorization': 'Bearer $_accessToken'},
+    );
+    if (response.statusCode == 200) {
+      BoxUser result = BoxUser.fromJson(jsonDecode(response.body));
+      _currentUser = result;
+
+      debugPrint('BoxUser\'s name is ${_currentBoxUser!.name}');
+      return currentUser;
+    } else {
+      _currentUser = null;
+      final String message =
+          'Unable to retrieve Box user. Response status code was ${response.statusCode}';
+      debugPrint(message);
+      // throw BoxServiceException(message);
+    }
+    return currentUser;
+  }
+
+  /// In-Memory Credentials
+  ///
+  /// We'll manage these for clients. If they are blank we can assume an auth
+  /// must occur.
+  ///
   String _accessToken = '';
   String _refreshToken = '';
-  DateTime _accessTokenExpiry = DateTime.now(); // We will set it
+  DateTime _accessTokenExpiry = DateTime.now();
+
+  void _clearInMemoryCredentials() {
+    _accessToken = '';
+    _refreshToken = '';
+    _accessTokenExpiry = DateTime.now();
+  }
 
   /////////////////////////////////////////////////////////////////////////////
   Future<void> _readCredentials() async {
@@ -207,6 +278,14 @@ class BoxService {
   }
 
   /////////////////////////////////////////////////////////////////////////////
+  Future<void> _deleteCredentials() async {
+    // Remove all API credentials, regardless of their state.
+    await _secureStorage.delete(key: 'box_dot_com_refresh_token');
+    await _secureStorage.delete(key: 'box_dot_com_access_token');
+    await _secureStorage.delete(key: 'box_dot_com_access_token_expiry');
+  }
+
+  /////////////////////////////////////////////////////////////////////////////
   // Will first try to retrieve a refreshToken from secure local storage, but if
   // none or if expired, will attempt an authenticate. It will manage preserving
   // any updated tokens, but will also return it in the Future in case clilents
@@ -228,12 +307,12 @@ class BoxService {
         callbackUrlScheme: callbackUrlScheme,
       );
 
-      // Extract code from resulting url
+      // Extract authCode from resulting url
       debugPrint('result of authenticate was ${result.toString()}');
       final authCode = Uri.parse(result).queryParameters['code'];
       debugPrint('authCode is $authCode');
 
-      // Use this code to get an access token
+      // Use the authCode to get an access token
       final response = await http.post(Uri.parse(tokenEndpoint), headers: {
         'Content-type': 'application/x-www-form-urlencoded'
       }, body: {
@@ -251,23 +330,20 @@ class BoxService {
         debugPrint(prettyprintResp);
       }
 
-      // Get the access token from the response
+      // Get the access token, expiry, and refresh token from the response
       _accessToken = responseBody['access_token'] as String;
       _refreshToken = responseBody['refresh_token'] as String;
       final expiresIn = responseBody['expires_in'] as int;
       _accessTokenExpiry = DateTime.now().add(Duration(seconds: expiresIn));
+      await _writeCredentials();
+      await _fetchAndSetCurrentBoxUser();
     } on PlatformException catch (pe) {
       debugPrint(
           'Did not get desired auth. exception message is: ${pe.message}');
-      // Clear all in-memory credentials.
-      _accessToken = '';
-      _refreshToken = '';
-      _accessTokenExpiry = DateTime.now();
-    } finally {
-      // Preserve the credentials.
-      await _writeCredentials();
+      // Clear both stored and in-memory credentials.
+      _deleteCredentials();
+      _clearInMemoryCredentials();
     }
-
     return _accessToken;
   }
 
@@ -324,42 +400,20 @@ class BoxService {
       _refreshToken = responseBody['refresh_token'] as String;
       final expiresIn = responseBody['expires_in'] as int;
       _accessTokenExpiry = DateTime.now().add(Duration(seconds: expiresIn));
+      await _writeCredentials();
+      await _fetchAndSetCurrentBoxUser();
     } on PlatformException catch (pe) {
       debugPrint(
           'Did not get desired auth. exception message is: ${pe.message}');
-      _accessToken = '';
-      _refreshToken = '';
-      _accessTokenExpiry = DateTime.now();
-    } finally {
-      await _writeCredentials();
+      // Clear both stored and in-memory credentials.
+      _deleteCredentials();
+      _clearInMemoryCredentials();
     }
-
     return _accessToken;
   }
 
   //////////////////////////////////////////////////////////////////////////////
-  // Returns null if any errors or if auth is bailed.
-  Future<BoxUser?> getUser() async {
-    const usersMe = '$boxApiRoot/users/me';
-
-    await refreshOrAuthForAccessTokenIfNeeded();
-
-    http.Response response = await http.get(
-      Uri.parse(usersMe),
-      headers: {'authorization': 'Bearer $_accessToken'},
-    );
-    if (response.statusCode == 200) {
-      BoxUser result = BoxUser.fromJson(jsonDecode(response.body));
-      debugPrint('BoxUser\'s name is ${result.name}');
-      return result;
-    } else {
-      debugPrint(
-          'Unable to retrieve Box user. Response status code was ${response.statusCode}');
-      return null;
-    }
-  }
-
-  //////////////////////////////////////////////////////////////////////////////
+  /// Throws Exception fi anyhting goes wrong.
   Future<List<BoxFolderItem>> fetchFolderItems(
       {required final String inFolderWithId}) async {
     const fieldsPortion =
@@ -556,6 +610,70 @@ class BoxService {
         Unable to upload $localPathname to $simpleFilename in parent folder $parentFolderId''');
 
       return null;
+    }
+  }
+
+  /////////////////////////////////////////////////////////////////////////////
+  /// logoutUser
+  ///
+  /// Actually the Auth revokeToken method, which effectively logs out the
+  /// current user.
+  ///
+  /// As of Feb 16, 2022, this function was not returniing 200 status code ever,
+  /// but since we wipe out all Box credentials it "appears" to work.  See this
+  /// issue at developer.box.com for more:
+  /// https://support.box.com/hc/en-us/community/posts/360049142094-Error-while-trying-to-revoke-token
+  ///
+  /////////////////////////////////////////////////////////////////////////////
+  Future<void> logoutUser() async {
+    //
+    // curl -i -X POST "https://api.box.com/oauth2/revoke" \
+    //      -H "Content-Type: application/x-www-form-urlencoded" \
+    //      -d "client_id=[CLIENT_ID]" \
+    //      -d "client_secret=[CLIENT_SECRET]" \
+    //      -d "token=[ACCESS_TOKEN]"
+    //
+
+    final headers = {'Content-type': 'application/x-www-form-urlencoded'};
+
+    final body = jsonEncode({
+      'client_id': _clientId,
+      'client_secret': _clientSecret,
+      'token': _accessToken,
+    });
+
+    // We will now clear those values from our memory and from secure local
+    // storage
+    //
+    _deleteCredentials();
+    _clearInMemoryCredentials();
+
+    debugPrint(headers.toString());
+    debugPrint(body);
+    debugPrint(revokeEndpoint);
+
+    final response = await http.post(Uri.parse(revokeEndpoint),
+        headers: headers, body: body);
+
+    // if (kDebugMode) {
+    //   dynamic responseBody = jsonDecode(response.body);
+    //   JsonEncoder encoder = const JsonEncoder.withIndent('  ');
+    //   String prettyprintResp = encoder.convert(responseBody);
+    //   debugPrint(prettyprintResp);
+    // }
+
+    _currentUser = null;
+
+    if (response.statusCode == 200) {
+      // Successfully revoked token
+      debugPrint('logout from Box.com successful');
+    } else {
+      // Not likely harmful, but let's let clients know things are not right.
+      final String message =
+          'Error logging out of Box.com. StatusCode was ${response.statusCode}';
+
+      debugPrint(message);
+      throw BoxServiceException(message);
     }
   }
 }
